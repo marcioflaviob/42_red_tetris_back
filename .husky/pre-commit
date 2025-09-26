@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "Running pre-commit checks..."
+
+# Run lint-staged, which executes linting, formatting, and related tests
+npx lint-staged || {
+  echo "Pre-commit checks failed! Aborting commit."
+  exit 1
+}
+
+echo "Pre-commit checks passed successfully."
