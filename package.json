@@ -24,12 +24,8 @@
   },
   "homepage": "https://github.com/marcioflaviob/42_red_tetris_back#readme",
   "dependencies": {
-    "@apollo/server": "^5.0.0",
-    "@as-integrations/express5": "^1.1.2",
-    "body-parser": "^2.2.0",
     "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "graphql": "^16.11.0"
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "eslint": "^9.36.0",
