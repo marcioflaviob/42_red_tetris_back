@@ -37,18 +37,12 @@ export default [
     },
     rules: {
       'prettier/prettier': 'error',
-      'no-console': 'warn',
+      'no-console': 'off',
       'no-unused-vars': 'error',
       'no-undef': 'error',
     },
   },
   {
-    ignores: [
-      'node_modules/**',
-      'coverage/**',
-      'dist/**',
-      'build/**',
-      '*.log',
-    ],
+    ignores: ['node_modules/**', 'coverage/**', 'dist/**', 'build/**', '*.log'],
   },
 ];

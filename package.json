@@ -25,7 +25,8 @@
   "homepage": "https://github.com/marcioflaviob/42_red_tetris_back#readme",
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "eslint": "^9.36.0",
