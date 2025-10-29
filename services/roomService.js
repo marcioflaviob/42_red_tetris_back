@@ -1,55 +1,72 @@
-import Room from "../models/Room.js";
-import User from "../models/User.js";
-import { ApiException } from "../utils/ApiException.js";
-import dicewareService from "./dicewareService.js"
+import { setTimeout } from 'timers';
+import Room from '../models/Room.js';
+import User from '../models/User.js';
+import { ApiException } from '../utils/ApiException.js';
+import socketService from './socketService.js';
 
 class RoomService {
+  rooms = new Map();
 
-    rooms = {};
+  async createRoom(userData, roomData) {
+    if (!userData) throw new ApiException('User not defined', 400);
 
-    createRoom(userData, roomData) {
-        if (!userData) throw new ApiException('User not defined', 400);
-        const user = new User({
-            id: userData.id,
-            username: userData.username,
-            host: true
-        })
-        const room = new Room({
-            players: [user],
-            invisiblePieces: roomData.invisiblePieces,
-            increasedGravity: roomData.increasedGravity
-        })
+    // TODO: remove 3 second delay and async from the function
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        this.rooms[room.id] = room;
+    const user = new User({
+      sessionId: userData.sessionId,
+      username: userData.username,
+      avatar: userData.avatar,
+      host: true,
+    });
+    const room = new Room({
+      players: [user],
+      invisiblePieces: roomData.invisiblePieces,
+      increasedGravity: roomData.increasedGravity,
+    });
 
-        return room;
+    this.rooms.set(room.id, room);
+
+    return room;
+  }
+
+  isUserInTheRoom(sessionId, roomId) {
+    const room = this.rooms.get(roomId);
+    return room?.players?.some((player) => player.sessionId === sessionId);
+  }
+
+  joinRoom(user, roomId) {
+    const room = this.getRoom(user, roomId);
+
+    if (room.startedAt)
+      throw new ApiException('Match has already started', 400);
+
+    if (!this.isUserInTheRoom(user.sessionId, roomId)) {
+      if (room.players.length >= 5)
+        throw new ApiException('Match is full', 400);
+      room.players.push(user);
     }
 
-    joinRoom(roomId, user) {
-        const room = this.getRoom(roomId);
+    socketService.handleJoinRoom(room, user);
 
-        if (room.startedAt) throw new ApiException('Match has already started', 400);
+    return room;
+  }
 
-        if (room.players.some(player => player.sessionId === user.sessionId))
-            throw new ApiException('Player already in the room', 400);
-        
-        room.players.push(user);
+  getRoom(user, roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room) throw new ApiException('Room not found', 404);
+
+    if (!this.isUserInTheRoom(user.sessionId, roomId)) {
+      if (room.startedAt)
+        throw new ApiException('You are not part of this match', 400);
     }
 
-    getRoom(roomId, user) {
-        const room = this.rooms[roomId];
-        if (!room) throw new ApiException('Room not found', 404);
+    return room;
+  }
 
-        if (!room.players.some(player => player.sessionId === user.sessionId)) {
-            // User cannot get information or join a match that has already started
-            if (room.startedAt) throw new ApiException('Match has already started', 400);
-            this.joinRoom(roomId, user);
-        }
-
-        return room;
-    }
-
-
+  roomExists(roomId) {
+    return this.rooms.get(roomId);
+  }
 }
 
 export default new RoomService();

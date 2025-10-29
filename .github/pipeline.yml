@@ -2,7 +2,7 @@ name: Checks
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
@@ -31,7 +31,7 @@ jobs:
       - name: Run Jest tests
         run: npx jest --coverage
         env:
-          
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
         with:
