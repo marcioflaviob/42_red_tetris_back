@@ -5,7 +5,7 @@ export const getHealth = (req, res) => {
   const endTime = process.hrtime.bigint();
   const processingTimeMs = Number(endTime - startTime) / 1_000_000;
 
-  res.json({
+  res.status(isHealthy ? 200 : 503).json({
     status: isHealthy ? 'OK' : 'KO',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
