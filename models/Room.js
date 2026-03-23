@@ -4,10 +4,13 @@ class Room {
   constructor(options = {}) {
     this.id = dicewareService.getTwoRandomWords();
     this.players = options.players || [];
-    ((this.invisiblePieces = options.invisiblePieces),
-      (this.increasedGravity = options.increasedGravity),
-      (this.startedAt = null));
+    this.piecePrediction = options.piecePrediction;
+    this.invisiblePieces = options.invisiblePieces;
+    this.increasedGravity = options.increasedGravity;
+    this.nextPieces = options.nextPieces;
+    this.startedAt = null;
     this.endedAt = null;
+    this.online = true;
   }
 }
 

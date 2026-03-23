@@ -1,0 +1,150 @@
+import moveValidationService from './moveValidationService.js';
+import boardService from './boardService.js';
+
+class GameEventHandler {
+  async handleGameAction(socket, data, socketService) {
+    const eventType = data?.event;
+
+    // Board events are handled separately
+    if (eventType === 'board') {
+      return this.handleBoardEvent(socket, data, socketService);
+    }
+
+    // All other events (active-piece, move, etc.) are treated as move actions
+    return this.handleMove(socket, data, socketService);
+  }
+
+  async handleMove(socket, data, socketService) {
+    try {
+      // Validate request structure
+      moveValidationService.validateMoveRequest(data);
+
+      // Validate move is possible (board exists and game not over)
+      const board = boardService.getBoardForPlayer(socket.currentRoom, socket.sessionId);
+
+      if (!moveValidationService.canExecuteMove(board)) {
+        socket.emit('invalid_move', {
+          action: data.action,
+          reason: 'Board not available or game over',
+        });
+        return;
+      }
+
+      // Execute move
+      const result = boardService.movePiece(socket.currentRoom, socket.sessionId, data.action);
+
+      if (!result.success) {
+        socket.emit('move_failed', {
+          action: data.action,
+          reason: result.reason,
+        });
+        return;
+      }
+
+      // Broadcast results
+      const shortSessionId = socket.sessionId.slice(0, 8);
+      console.log(`Player ${socket.username} (${shortSessionId}) made move: ${data.action} in room ${socket.currentRoom}`);
+      socketService.userBroadcast(socket, shortSessionId, data);
+      socketService.serverBroadcast(socket.currentRoom, 'board', result.board);
+    } catch (error) {
+      console.error('Move error:', error);
+      socket.emit('error', { message: error.message });
+    }
+  }
+
+  async handleBoardEvent(socket, data, socketService) {
+    const action = data?.action;
+    const boardActions = {
+      'clear-row': () => this.handleClearRows(socket, data, socketService),
+    };
+
+    const actionHandler = boardActions[action];
+    if (actionHandler) {
+      await actionHandler();
+    } else {
+      socket.emit('error', { message: `Unknown board action: ${action}` });
+    }
+  }
+
+  async handleClearRows(socket, data, socketService) {
+    try {
+      // Get board for player
+      const board = boardService.getBoardForPlayer(socket.currentRoom, socket.sessionId);
+
+      if (!moveValidationService.canExecuteMove(board)) {
+        socket.emit('clear_rows_failed', {
+          action: data.action,
+          reason: 'Board not available or game over',
+        });
+        return;
+      }
+
+      // Validate request structure and requested rows against current board state
+      moveValidationService.validateRowClearRequest(data, board);
+
+      // Clear the rows
+      const result = board.clearRows(data.rows);
+
+      if (!result.success) {
+        socket.emit('clear_rows_failed', {
+          action: data.action,
+          reason: result.reason,
+          rows: data.rows,
+        });
+        return;
+      }
+
+      // Broadcast clear-row event so clients can apply row clear updates immediately
+      const shortSessionId = socket.sessionId.slice(0, 8);
+      socketService.userBroadcast(socket, shortSessionId, {
+        event: 'board',
+        action: 'clear-row',
+        rows: result.rowsCleared,
+      });
+
+      // Keep dedicated clear-row event for clients listening directly on this channel
+      socketService.serverBroadcast(socket.currentRoom, 'clear-row', {
+        action: data.action,
+        rows: result.rowsCleared,
+        userId: socket.sessionId,
+      });
+
+      // Broadcast updated board state to all players in the room
+      socketService.serverBroadcast(socket.currentRoom, 'board', board);
+
+      // Confirm to the player who cleared the rows
+      socket.emit('rows_cleared', {
+        clearedRows: result.clearedRows,
+        rows: result.rowsCleared,
+      });
+    } catch (error) {
+      console.error('Clear rows error:', error);
+      socket.emit('error', { message: error.message });
+    }
+  }
+
+  handleJoinRoom(socket, data, socketService) {
+    try {
+      if (!socket.sessionId) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+
+      socket.join(data.roomId);
+      socket.currentRoom = data.roomId;
+
+      socketService.serverBroadcast(data.roomId, 'room_update', {
+        type: 'player_joined',
+        player: {
+          sessionId: socket.sessionId,
+          username: socket.username,
+        },
+      });
+    } catch (error) {
+      console.error('Join room error:', error);
+      socket.emit('error', { message: error.message });
+    }
+  }
+}
+
+export default new GameEventHandler();
