@@ -16,39 +16,32 @@ class GameEventHandler {
 
   async handleMove(socket, data, socketService) {
     try {
-      // Validate request structure
       moveValidationService.validateMoveRequest(data);
-
-      // Validate move is possible (board exists and game not over)
-      const board = boardService.getBoardForPlayer(socket.currentRoom, socket.sessionId);
-
-      if (!moveValidationService.canExecuteMove(board)) {
-        socket.emit('invalid_move', {
-          action: data.action,
-          reason: 'Board not available or game over',
-        });
-        return;
-      }
-
-      // Execute move
-      const result = boardService.movePiece(socket.currentRoom, socket.sessionId, data.action);
-
-      if (!result.success) {
-        socket.emit('move_failed', {
-          action: data.action,
-          reason: result.reason,
-        });
-        return;
-      }
-
-      // Broadcast results
-      const shortSessionId = socket.sessionId.slice(0, 8);
-      console.log(`Player ${socket.username} (${shortSessionId}) made move: ${data.action} in room ${socket.currentRoom}`);
-      socketService.userBroadcast(socket, shortSessionId, data);
-      socketService.serverBroadcast(socket.currentRoom, 'board', result.board);
     } catch (error) {
-      console.error('Move error:', error);
       socket.emit('error', { message: error.message });
+      return;
+    }
+
+    // Broadcast first — the frontend is authoritative for game state.
+    // Backend board validation must never gate the broadcast; if the backend
+    // board drifts (e.g. false game-over), moves would silently stop reaching
+    // spectators while the player's game continues normally.
+    const shortSessionId = socket.sessionId.slice(0, 8);
+    console.log(`Player ${socket.username} (${shortSessionId}) made move: ${data.action} in room ${socket.currentRoom}`);
+    socketService.userBroadcast(socket, shortSessionId, data);
+
+    // Best-effort: keep backend board in sync for clear-row validation.
+    // Errors here are non-fatal — they only affect backend state tracking.
+    try {
+      const board = boardService.getBoardForPlayer(socket.currentRoom, socket.sessionId);
+      if (moveValidationService.canExecuteMove(board)) {
+        const result = boardService.movePiece(socket.currentRoom, socket.sessionId, data.action);
+        if (result.success) {
+          socketService.serverBroadcast(socket.currentRoom, 'board', result.board);
+        }
+      }
+    } catch (error) {
+      console.error('Backend board sync error (non-fatal):', error.message);
     }
   }
 
@@ -57,6 +50,7 @@ class GameEventHandler {
     const boardActions = {
       'clear-row': () => this.handleClearRows(socket, data, socketService),
       'add-garbage': () => this.handleAddGarbage(socket, data, socketService),
+      'board-sync': () => this.handleBoardSync(socket, data, socketService),
     };
 
     const actionHandler = boardActions[action];
@@ -152,6 +146,27 @@ class GameEventHandler {
     if (socket.currentRoom) {
       socketService.serverBroadcast(socket.currentRoom, 'garbage-pending', { targetId, lines });
     }
+  }
+
+  handleBoardSync(socket, data, socketService) {
+    const { board } = data || {};
+    if (!Array.isArray(board)) return;
+
+    // Replace backend board with the frontend's authoritative state.
+    // Also reset gameOver in case drift caused a false positive.
+    const backendBoard = boardService.getBoardForPlayer(socket.currentRoom, socket.sessionId);
+    if (backendBoard) {
+      backendBoard.board = [...board];
+      backendBoard.gameOver = false;
+    }
+
+    // Relay snapshot to all spectators in the room
+    const shortSessionId = socket.sessionId.slice(0, 8);
+    socketService.userBroadcast(socket, shortSessionId, {
+      event: 'board',
+      action: 'board-sync',
+      board,
+    });
   }
 
   handleJoinRoom(socket, data, socketService) {
