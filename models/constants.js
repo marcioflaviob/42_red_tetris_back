@@ -58,6 +58,9 @@ export const COLOR = {
   TURK: 7,
 };
 
+// Separate from COLOR to avoid being picked up by PieceBag's Object.values(COLOR)
+export const GARBAGE_COLOR = 8;
+
 export const LEVEL = {
   1: 3, // Lines to be cleared to move to the next level
   2: 5,

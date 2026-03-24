@@ -84,6 +84,9 @@ class SocketService {
 
     // Board events (like clear-row)
     socket.on('board', (data) => gameEventHandler.handleBoardEvent(socket, data, this));
+
+    // Garbage queue: route garbage lines to a target player
+    socket.on('send-garbage', (data) => gameEventHandler.handleGarbageSend(socket, data, this));
   }
 
   handleDisconnect(socket) {

@@ -56,6 +56,7 @@ class GameEventHandler {
     const action = data?.action;
     const boardActions = {
       'clear-row': () => this.handleClearRows(socket, data, socketService),
+      'add-garbage': () => this.handleAddGarbage(socket, data, socketService),
     };
 
     const actionHandler = boardActions[action];
@@ -120,6 +121,32 @@ class GameEventHandler {
     } catch (error) {
       console.error('Clear rows error:', error);
       socket.emit('error', { message: error.message });
+    }
+  }
+
+  handleAddGarbage(socket, data, socketService) {
+    const { lines } = data || {};
+    if (!lines || lines <= 0) return;
+
+    // Relay to all room members so their OnlineGameCards can render the grey rows
+    const shortSessionId = socket.sessionId.slice(0, 8);
+    socketService.userBroadcast(socket, shortSessionId, {
+      event: 'board',
+      action: 'add-garbage',
+      lines,
+    });
+  }
+
+  handleGarbageSend(socket, data, socketService) {
+    const { targetId, lines } = data || {};
+    if (!targetId || !lines || lines <= 0) return;
+
+    // Notify the target's own game so they see the pending bar fill up
+    socketService.sendToUser(targetId, 'garbage-queued', { lines });
+
+    // Notify the whole room so everyone sees the pending bar on the target's card
+    if (socket.currentRoom) {
+      socketService.serverBroadcast(socket.currentRoom, 'garbage-pending', { targetId, lines });
     }
   }
 
