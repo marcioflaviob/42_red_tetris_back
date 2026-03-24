@@ -128,6 +128,10 @@ class GameEventHandler {
     const { lines } = data || {};
     if (!lines || lines <= 0) return;
 
+    // Keep the backend board in sync so subsequent clear-row validation is correct
+    const board = boardService.getBoardForPlayer(socket.currentRoom, socket.sessionId);
+    if (board) board.addGarbageRows(lines);
+
     // Relay to all room members so their OnlineGameCards can render the grey rows
     const shortSessionId = socket.sessionId.slice(0, 8);
     socketService.userBroadcast(socket, shortSessionId, {
