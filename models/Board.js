@@ -1,4 +1,4 @@
-import { BOARD_COLS, BOARD_ROWS, BUFFER_ZONE_ROWS, COLLISION, MOVES } from './constants.js';
+import { BOARD_COLS, BOARD_ROWS, BUFFER_ZONE_ROWS, COLLISION, GARBAGE_COLOR, MOVES } from './constants.js';
 import PieceBag from './PieceBag.js';
 import { Tetromino } from './Tetromino.js';
 import { hasCollided } from './helper.js';
@@ -157,6 +157,15 @@ class Board {
       });
     }
     return collision;
+  };
+
+  addGarbageRows = (lines) => {
+    if (!lines || lines <= 0) return;
+    const linesToAdd = Math.min(lines, BOARD_ROWS);
+    for (let i = 0; i < linesToAdd; i++) {
+      this.board.splice(0, BOARD_COLS);
+      this.board.push(...new Array(BOARD_COLS).fill(GARBAGE_COLOR));
+    }
   };
 
   isRowFull = (rowIndex) => {
