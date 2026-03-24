@@ -192,9 +192,10 @@ class Board {
       }
     }
 
-    // Clear only rows that are currently full.
-    // This keeps the operation idempotent in case a clear-row event is replayed or delayed.
-    const rowsToClear = [...new Set(rows)].filter((row) => this.isRowFull(row)).sort((a, b) => a - b);
+    // Trust the frontend's row list — the client is authoritative for which rows are full.
+    // Filtering with isRowFull causes compound drift: any partial mismatch means the backend
+    // clears fewer rows than the frontend, shifting all future piece positions off by that delta.
+    const rowsToClear = [...new Set(rows)].sort((a, b) => a - b);
 
     rowsToClear.forEach((row) => {
       this.board.splice(row * BOARD_COLS, BOARD_COLS);
