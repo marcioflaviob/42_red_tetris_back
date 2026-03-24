@@ -68,6 +68,46 @@ class RoomService {
     return room;
   }
 
+  eliminatePlayer(roomId, sessionId) {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    const player = room.players.find((p) => p.sessionId === sessionId);
+    if (player) player.eliminated = true;
+  }
+
+  getActivePlayers(roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room) return [];
+    return room.players.filter((p) => !p.eliminated);
+  }
+
+  // Creates a new room with a fresh ID/seed but the same settings and players.
+  // Called on "play again" — gives every player a new board and resets elimination state.
+  createNextRoom(oldRoomId, hostSessionId) {
+    const oldRoom = this.rooms.get(oldRoomId);
+    if (!oldRoom) throw new ApiException('Room not found', 404);
+
+    const newRoom = new Room({
+      invisiblePieces: oldRoom.invisiblePieces,
+      increasedGravity: oldRoom.increasedGravity,
+      piecePrediction: oldRoom.piecePrediction,
+    });
+
+    oldRoom.players.forEach((oldPlayer) => {
+      const newUser = new User({
+        sessionId: oldPlayer.sessionId,
+        username: oldPlayer.username,
+        avatar: oldPlayer.avatar,
+        host: oldPlayer.sessionId === hostSessionId,
+        board: boardService.createBoard(newRoom.id),
+      });
+      newRoom.players.push(newUser);
+    });
+
+    this.rooms.set(newRoom.id, newRoom);
+    return newRoom;
+  }
+
   roomExists(roomId) {
     return this.rooms.get(roomId);
   }
