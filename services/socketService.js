@@ -87,6 +87,10 @@ class SocketService {
 
     // Garbage queue: route garbage lines to a target player
     socket.on('send-garbage', (data) => gameEventHandler.handleGarbageSend(socket, data, this));
+
+    // Game-ending events
+    socket.on('player-game-over', () => gameEventHandler.handlePlayerGameOver(socket, this));
+    socket.on('play-again', () => gameEventHandler.handlePlayAgain(socket, this));
   }
 
   handleDisconnect(socket) {

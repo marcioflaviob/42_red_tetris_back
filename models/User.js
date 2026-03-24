@@ -6,6 +6,7 @@ class User {
     this.host = options.host || false;
     this.board = options.board;
     this.score = null;
+    this.eliminated = false;
   }
 }
 

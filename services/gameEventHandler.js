@@ -1,5 +1,6 @@
 import moveValidationService from './moveValidationService.js';
 import boardService from './boardService.js';
+import roomService from './roomService.js';
 
 class GameEventHandler {
   async handleGameAction(socket, data, socketService) {
@@ -167,6 +168,41 @@ class GameEventHandler {
       action: 'board-sync',
       board,
     });
+  }
+
+  handlePlayerGameOver(socket, socketService) {
+    if (!socket.currentRoom) return;
+
+    roomService.eliminatePlayer(socket.currentRoom, socket.sessionId);
+
+    socketService.serverBroadcast(socket.currentRoom, 'room_update', {
+      type: 'player_eliminated',
+      sessionId: socket.sessionId,
+    });
+
+    const activePlayers = roomService.getActivePlayers(socket.currentRoom);
+    if (activePlayers.length <= 1) {
+      const winner = activePlayers[0] || null;
+      socketService.serverBroadcast(socket.currentRoom, 'room_update', {
+        type: 'match_over',
+        winner: winner ? { sessionId: winner.sessionId, username: winner.username } : null,
+      });
+    }
+  }
+
+  handlePlayAgain(socket, socketService) {
+    if (!socket.currentRoom) return;
+    try {
+      const newRoom = roomService.createNextRoom(socket.currentRoom, socket.sessionId);
+      // Broadcast to old room before anyone leaves — all clients will navigate to new URL
+      socketService.serverBroadcast(socket.currentRoom, 'room_update', {
+        type: 'new_room',
+        roomId: newRoom.id,
+      });
+    } catch (error) {
+      console.error('Play again error:', error);
+      socket.emit('error', { message: error.message });
+    }
   }
 
   handleJoinRoom(socket, data, socketService) {
