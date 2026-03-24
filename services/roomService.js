@@ -1,29 +1,30 @@
-import { setTimeout } from 'timers';
 import Room from '../models/Room.js';
 import User from '../models/User.js';
 import { ApiException } from '../utils/ApiException.js';
+import boardService from './boardService.js';
 import socketService from './socketService.js';
 
 class RoomService {
   rooms = new Map();
 
-  async createRoom(userData, roomData) {
+  createRoom(userData, roomData) {
     if (!userData) throw new ApiException('User not defined', 400);
 
-    // TODO: remove 3 second delay and async from the function
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const room = new Room({
+      invisiblePieces: roomData.invisiblePieces,
+      increasedGravity: roomData.increasedGravity,
+      piecePrediction: roomData.piecePrediction,
+    });
 
     const user = new User({
       sessionId: userData.sessionId,
       username: userData.username,
       avatar: userData.avatar,
       host: true,
+      board: boardService.createBoard(room.id),
     });
-    const room = new Room({
-      players: [user],
-      invisiblePieces: roomData.invisiblePieces,
-      increasedGravity: roomData.increasedGravity,
-    });
+
+    room.players.push(user);
 
     this.rooms.set(room.id, room);
 
@@ -44,6 +45,9 @@ class RoomService {
     if (!this.isUserInTheRoom(user.sessionId, roomId)) {
       if (room.players.length >= 5)
         throw new ApiException('Match is full', 400);
+      
+      // Create a board for the joining player
+      user.board = boardService.createBoard(room.id);
       room.players.push(user);
     }
 

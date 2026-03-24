@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import { ApiException } from '../utils/ApiException.js';
+import gameEventHandler from './gameEventHandler.js';
 
 class SocketService {
   constructor() {
@@ -25,12 +25,25 @@ class SocketService {
   }
 
   handleConnection(socket) {
+    // Authenticate
+    if (!this.authenticateSocket(socket)) {
+      return;
+    }
+
+    // Register event handlers
+    this.registerEventHandlers(socket);
+
+    // Handle disconnect
+    socket.on('disconnect', () => this.handleDisconnect(socket));
+  }
+
+  authenticateSocket(socket) {
     try {
       const { sessionId, username } = socket.handshake?.auth || {};
       if (!sessionId || !username) {
         console.log('Error here, no username or sessionID');
         socket.emit('error', { message: 'Invalid authentication data' });
-        return;
+        return false;
       }
 
       socket.sessionId = sessionId;
@@ -38,38 +51,42 @@ class SocketService {
       this.connectedUsers.set(sessionId, socket);
 
       socket.emit('authenticated', { sessionId, username });
-      console.log(`User authenticated: ${username} (${sessionId})`);
+      console.log(`✓ User authenticated: ${username} (${sessionId.slice(0, 8)})`);
+      return true;
     } catch {
       socket.emit('error', { message: 'Authentication failed' });
+      return false;
     }
-    // Room events
-    socket.on('join_room', (data) => this.handleJoinRoom(socket, data));
-
-    // Disconnect
-    socket.on('disconnect', () => this.handleDisconnect(socket));
   }
 
-  handleJoinRoom(room, user) {
-    try {
-      const socket = this.connectedUsers.get(user.sessionId);
-      if (!socket || !socket.sessionId) {
-        socket.emit('error', { message: 'Not authenticated' });
-        throw new ApiException('User not connected', 400);
+  registerEventHandlers(socket) {
+    // Room events
+    socket.on('join_room', (data) => gameEventHandler.handleJoinRoom(socket, data, this));
+    socket.on('start_game', () => {
+      if (!socket.currentRoom) {
+        socket.emit('error', { message: 'You are not in a room' });
+        return;
       }
 
-      socket.join(room.id);
-      socket.currentRoom = room.id;
-
-      this.broadcastToRoom(room.id, 'room_update', {
-        type: 'player_joined',
-        room: room,
-        player: user,
+      this.serverBroadcast(socket.currentRoom, 'room_update', {
+        type: 'game_started',
+        startedBy: socket.sessionId,
+        startedAt: new Date().toISOString(),
       });
+    });
 
-      //   socket.emit('room_joined', { room });
-    } catch (error) {
-      console.error(error);
-    }
+    const shortSessionId = socket.sessionId.slice(0, 8);
+    console.log(`Registering event handler on socket ${shortSessionId} for user ${socket.username}`);
+    socket.on(shortSessionId, (data) => {
+      console.log(`✓ Backend received event on ${shortSessionId}:`, data);
+      gameEventHandler.handleGameAction(socket, data, this);
+    });
+
+    // Board events (like clear-row)
+    socket.on('board', (data) => gameEventHandler.handleBoardEvent(socket, data, this));
+
+    // Garbage queue: route garbage lines to a target player
+    socket.on('send-garbage', (data) => gameEventHandler.handleGarbageSend(socket, data, this));
   }
 
   handleDisconnect(socket) {
@@ -87,10 +104,40 @@ class SocketService {
     }
   }
 
+  handleJoinRoom(room, user) {
+    const socket = this.connectedUsers.get(user.sessionId);
+    if (!socket) {
+      console.error('Socket not found for user:', user.sessionId);
+      return;
+    }
+
+    socket.join(room.id);
+    socket.currentRoom = room.id;
+    console.log(`✓ Socket joined room. User: ${socket.username} (${socket.sessionId}), Room: ${room.id}, currentRoom set to: ${socket.currentRoom}`);
+
+    this.serverBroadcast(room.id, 'room_update', {
+      type: 'player_joined',
+      room: room,
+      player: user,
+    });
+  }
+
   // Utility methods for broadcasting
-  broadcastToRoom(roomId, event, data) {
-    console.log(`Broadcasting to ${roomId} the message`, data);
+  serverBroadcast(roomId, event, data) {
+    // console.log(`Broadcasting to ${roomId} the message`, data);
     this.io.to(roomId).emit(event, data);
+  }
+
+  userBroadcast(socket, event, data) {
+    console.log(`Broadcasting to ${socket.currentRoom} on event ${event}:`, data);
+    if (!socket.currentRoom) {
+      console.error(`ERROR: socket.currentRoom not set for user ${socket.sessionId}`);
+      return;
+    }
+    this.io.to(socket.currentRoom).emit(event, {
+      userId: socket.sessionId,
+      ...data,
+    });
   }
 
   sendToUser(sessionId, event, data) {

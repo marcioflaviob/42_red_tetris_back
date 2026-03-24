@@ -4,6 +4,7 @@ class User {
     this.username = options.username;
     this.avatar = options.avatar;
     this.host = options.host || false;
+    this.board = options.board;
     this.score = null;
   }
 }
