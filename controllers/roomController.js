@@ -3,7 +3,6 @@ import { asyncHandler } from '../utils/errorHandler.js';
 
 export const createRoom = asyncHandler(async (req, res) => {
   const room = await roomService.createRoom(req.body?.user, req.body?.room);
-  // console.log(room);
   res.json(room);
 });
 

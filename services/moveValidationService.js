@@ -8,7 +8,6 @@ class MoveValidationService {
     }
 
     if (!Object.values(MOVES).includes(data.action)) {
-      console.log('data received', data);
       throw new ApiException('Invalid action', 400);
     }
 
