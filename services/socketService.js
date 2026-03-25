@@ -124,7 +124,6 @@ class SocketService {
 
   // Utility methods for broadcasting
   serverBroadcast(roomId, event, data) {
-    // console.log(`Broadcasting to ${roomId} the message`, data);
     this.io.to(roomId).emit(event, data);
   }
 
