@@ -77,6 +77,16 @@ class SocketService {
     // Garbage queue: route garbage lines to a target player
     socket.on('send-garbage', (data) => gameEventHandler.handleGarbageSend(socket, data, this));
 
+    // Stats broadcast
+    socket.on('player-stats-update', (data) => {
+      if (!socket.currentRoom) return;
+      this.serverBroadcast(socket.currentRoom, 'player-stats-update', {
+        sessionId: socket.sessionId,
+        score: data.score,
+        accuracy: data.accuracy,
+      });
+    });
+
     // Game-ending events
     socket.on('player-game-over', () => gameEventHandler.handlePlayerGameOver(socket, this));
     socket.on('play-again', () => gameEventHandler.handlePlayAgain(socket, this));
