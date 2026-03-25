@@ -190,6 +190,53 @@ class GameEventHandler {
     }
   }
 
+  handleStartGame(socket, socketService) {
+    if (!socket.currentRoom) {
+      socket.emit('error', { message: 'You are not in a room' });
+      return;
+    }
+    roomService.startRoom(socket.currentRoom);
+    socketService.serverBroadcast(socket.currentRoom, 'room_update', {
+      type: 'game_started',
+      startedBy: socket.sessionId,
+      startedAt: new Date().toISOString(),
+    });
+  }
+
+  handlePlayerDisconnect(socket, socketService) {
+    const room = roomService.rooms.get(socket.currentRoom);
+    if (!room) return;
+
+    if (room.startedAt) {
+      // Game in progress: eliminate and gray out board for others
+      roomService.eliminatePlayer(socket.currentRoom, socket.sessionId);
+
+      socketService.serverBroadcast(socket.currentRoom, 'room_update', {
+        type: 'player_disconnected',
+        sessionId: socket.sessionId,
+      });
+
+      const activePlayers = roomService.getActivePlayers(socket.currentRoom);
+      if (activePlayers.length <= 1) {
+        const winner = activePlayers[0] || null;
+        socketService.serverBroadcast(socket.currentRoom, 'room_update', {
+          type: 'match_over',
+          winner: winner ? { sessionId: winner.sessionId, username: winner.username } : null,
+        });
+      }
+    } else {
+      // Lobby: remove player, reassign host if needed
+      const updatedRoom = roomService.removePlayer(socket.currentRoom, socket.sessionId);
+      if (updatedRoom) {
+        socketService.serverBroadcast(socket.currentRoom, 'room_update', {
+          type: 'player_left',
+          sessionId: socket.sessionId,
+          players: updatedRoom.players,
+        });
+      }
+    }
+  }
+
   handlePlayAgain(socket, socketService) {
     if (!socket.currentRoom) return;
     try {

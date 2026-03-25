@@ -62,18 +62,7 @@ class SocketService {
   registerEventHandlers(socket) {
     // Room events
     socket.on('join_room', (data) => gameEventHandler.handleJoinRoom(socket, data, this));
-    socket.on('start_game', () => {
-      if (!socket.currentRoom) {
-        socket.emit('error', { message: 'You are not in a room' });
-        return;
-      }
-
-      this.serverBroadcast(socket.currentRoom, 'room_update', {
-        type: 'game_started',
-        startedBy: socket.sessionId,
-        startedAt: new Date().toISOString(),
-      });
-    });
+    socket.on('start_game', () => gameEventHandler.handleStartGame(socket, this));
 
     const shortSessionId = socket.sessionId.slice(0, 8);
     console.log(`Registering event handler on socket ${shortSessionId} for user ${socket.username}`);
@@ -100,10 +89,7 @@ class SocketService {
       this.connectedUsers.delete(socket.sessionId);
 
       if (socket.currentRoom) {
-        socket.to(socket.currentRoom).emit('room_updated', {
-          type: 'player_disconnected',
-          sessionId: socket.sessionId,
-        });
+        gameEventHandler.handlePlayerDisconnect(socket, this);
       }
     }
   }
