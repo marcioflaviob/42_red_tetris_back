@@ -108,6 +108,31 @@ class RoomService {
     return newRoom;
   }
 
+  startRoom(roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    room.startedAt = new Date().toISOString();
+  }
+
+  removePlayer(roomId, sessionId) {
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+
+    const wasHost = room.players.find((p) => p.sessionId === sessionId)?.host;
+    room.players = room.players.filter((p) => p.sessionId !== sessionId);
+
+    if (room.players.length === 0) {
+      this.rooms.delete(roomId);
+      return null;
+    }
+
+    if (wasHost) {
+      room.players[0].host = true;
+    }
+
+    return room;
+  }
+
   roomExists(roomId) {
     return this.rooms.get(roomId);
   }

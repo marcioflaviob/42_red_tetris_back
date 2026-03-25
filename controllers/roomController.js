@@ -7,10 +7,10 @@ export const createRoom = asyncHandler(async (req, res) => {
   res.json(room);
 });
 
-export const joinRoom = (req, res) => {
+export const joinRoom = asyncHandler(async (req, res) => {
   const room = roomService.joinRoom(req.body?.user, req.params?.roomId);
   res.json(room);
-};
+});
 
 // // For async operations, wrap with asyncHandler
 // export const getHealth = asyncHandler(async (req, res) => {
